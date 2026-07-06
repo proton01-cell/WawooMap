@@ -1,0 +1,2602 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>최단 경로 안내 시스템</title>
+    <style>
+        body { font-family: 'Malgun Gothic', sans-serif; margin: 20px; background-color: #f8f9fa; }
+        #info-panel { margin-bottom: 15px; padding: 15px; background: #fff; border: 1px solid #dee2e6; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .status-text { font-weight: bold; color: #495057; }
+        #workspace { position: relative; display: inline-block; border: 2px solid #343a40; border-radius: 4px; overflow: hidden; background-color: #fff; }
+        #bg-image { display: block; max-width: 100%; pointer-events: none; }
+        #graph-canvas { position: absolute; top: 0; left: 0; cursor: pointer; }
+        button { padding: 6px 12px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 10px; }
+        button:hover { background-color: #5a6268; }
+    </style>
+</head>
+<body>
+
+    <h2>🗺️ 최단 경로 안내 시스템</h2>
+    
+    <div id="info-panel">
+        <span id="status-message" class="status-text">안내: 출발할 지점을 클릭하세요.</span>
+        <button onclick="resetSelection()">선택 초기화</button>
+    </div>
+
+    <div id="workspace">
+        <img id="bg-image" src="background.jpg" alt="배경 지도를 불러오는 중...">
+        <canvas id="graph-canvas"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('graph-canvas');
+        const ctx = canvas.getContext('2d');
+        const imgElement = document.getElementById('bg-image');
+        const statusMsg = document.getElementById('status-message');
+
+        const NODE_RADIUS = 5;
+
+        let nodes = [];
+        let edges = [];
+        
+        let startNode = null;
+        let endNode = null;
+        let shortestPath = null; 
+
+        window.addEventListener('DOMContentLoaded', () => {
+            
+            // =====================================================================
+            // ★ 가지고 계신 JSON 데이터를 아래에 복사해서 붙여넣으세요! ★
+            // =====================================================================
+            const myGraphData = {
+  "imageOriginalSize": {
+    "width": 1238,
+    "height": 1489
+  },
+  "nodes": [
+    {
+      "id": 1,
+      "x": 235,
+      "y": 1028
+    },
+    {
+      "id": 2,
+      "x": 255,
+      "y": 927
+    },
+    {
+      "id": 3,
+      "x": 265,
+      "y": 1337
+    },
+    {
+      "id": 4,
+      "x": 267,
+      "y": 1287
+    },
+    {
+      "id": 5,
+      "x": 248,
+      "y": 1211
+    },
+    {
+      "id": 6,
+      "x": 247,
+      "y": 1166
+    },
+    {
+      "id": 7,
+      "x": 317,
+      "y": 1165
+    },
+    {
+      "id": 8,
+      "x": 425,
+      "y": 1166
+    },
+    {
+      "id": 9,
+      "x": 415,
+      "y": 1288
+    },
+    {
+      "id": 10,
+      "x": 413,
+      "y": 1346
+    },
+    {
+      "id": 11,
+      "x": 564,
+      "y": 1358
+    },
+    {
+      "id": 12,
+      "x": 689,
+      "y": 1356
+    },
+    {
+      "id": 13,
+      "x": 785,
+      "y": 1379
+    },
+    {
+      "id": 14,
+      "x": 942,
+      "y": 1391
+    },
+    {
+      "id": 15,
+      "x": 921,
+      "y": 1330
+    },
+    {
+      "id": 16,
+      "x": 994,
+      "y": 1331
+    },
+    {
+      "id": 17,
+      "x": 1028,
+      "y": 1385
+    },
+    {
+      "id": 18,
+      "x": 1039,
+      "y": 1358
+    },
+    {
+      "id": 19,
+      "x": 840,
+      "y": 1379
+    },
+    {
+      "id": 20,
+      "x": 756,
+      "y": 1189
+    },
+    {
+      "id": 21,
+      "x": 884,
+      "y": 1195
+    },
+    {
+      "id": 22,
+      "x": 1012,
+      "y": 1163
+    },
+    {
+      "id": 23,
+      "x": 774,
+      "y": 1356
+    },
+    {
+      "id": 24,
+      "x": 665,
+      "y": 1189
+    },
+    {
+      "id": 25,
+      "x": 519,
+      "y": 1210
+    },
+    {
+      "id": 26,
+      "x": 570,
+      "y": 1161
+    },
+    {
+      "id": 27,
+      "x": 548,
+      "y": 1271
+    },
+    {
+      "id": 28,
+      "x": 181,
+      "y": 1203
+    },
+    {
+      "id": 29,
+      "x": 277,
+      "y": 1133
+    },
+    {
+      "id": 30,
+      "x": 268,
+      "y": 1403
+    },
+    {
+      "id": 31,
+      "x": 564,
+      "y": 1391
+    },
+    {
+      "id": 32,
+      "x": 556,
+      "y": 1321
+    },
+    {
+      "id": 33,
+      "x": 758,
+      "y": 1162
+    },
+    {
+      "id": 34,
+      "x": 886,
+      "y": 1162
+    },
+    {
+      "id": 35,
+      "x": 666,
+      "y": 1166
+    },
+    {
+      "id": 36,
+      "x": 190,
+      "y": 843
+    },
+    {
+      "id": 37,
+      "x": 248,
+      "y": 794
+    },
+    {
+      "id": 38,
+      "x": 303,
+      "y": 767
+    },
+    {
+      "id": 39,
+      "x": 319,
+      "y": 791
+    },
+    {
+      "id": 40,
+      "x": 464,
+      "y": 793
+    },
+    {
+      "id": 41,
+      "x": 461,
+      "y": 859
+    },
+    {
+      "id": 42,
+      "x": 459,
+      "y": 900
+    },
+    {
+      "id": 43,
+      "x": 504,
+      "y": 915
+    },
+    {
+      "id": 44,
+      "x": 503,
+      "y": 950
+    },
+    {
+      "id": 45,
+      "x": 525,
+      "y": 983
+    },
+    {
+      "id": 46,
+      "x": 581,
+      "y": 951
+    },
+    {
+      "id": 47,
+      "x": 592,
+      "y": 895
+    },
+    {
+      "id": 48,
+      "x": 593,
+      "y": 845
+    },
+    {
+      "id": 49,
+      "x": 594,
+      "y": 796
+    },
+    {
+      "id": 50,
+      "x": 544,
+      "y": 911
+    },
+    {
+      "id": 51,
+      "x": 527,
+      "y": 819
+    },
+    {
+      "id": 52,
+      "x": 520,
+      "y": 840
+    },
+    {
+      "id": 53,
+      "x": 666,
+      "y": 793
+    },
+    {
+      "id": 54,
+      "x": 746,
+      "y": 786
+    },
+    {
+      "id": 55,
+      "x": 756,
+      "y": 815
+    },
+    {
+      "id": 56,
+      "x": 929,
+      "y": 817
+    },
+    {
+      "id": 57,
+      "x": 931,
+      "y": 794
+    },
+    {
+      "id": 58,
+      "x": 962,
+      "y": 794
+    },
+    {
+      "id": 59,
+      "x": 958,
+      "y": 768
+    },
+    {
+      "id": 60,
+      "x": 1020,
+      "y": 790
+    },
+    {
+      "id": 61,
+      "x": 695,
+      "y": 955
+    },
+    {
+      "id": 62,
+      "x": 709,
+      "y": 982
+    },
+    {
+      "id": 63,
+      "x": 769,
+      "y": 986
+    },
+    {
+      "id": 64,
+      "x": 847,
+      "y": 985
+    },
+    {
+      "id": 65,
+      "x": 919,
+      "y": 985
+    },
+    {
+      "id": 66,
+      "x": 1004,
+      "y": 985
+    },
+    {
+      "id": 67,
+      "x": 1065,
+      "y": 984
+    },
+    {
+      "id": 68,
+      "x": 1049,
+      "y": 952
+    },
+    {
+      "id": 69,
+      "x": 1002,
+      "y": 953
+    },
+    {
+      "id": 70,
+      "x": 931,
+      "y": 954
+    },
+    {
+      "id": 71,
+      "x": 973,
+      "y": 922
+    },
+    {
+      "id": 72,
+      "x": 859,
+      "y": 953
+    },
+    {
+      "id": 73,
+      "x": 783,
+      "y": 955
+    },
+    {
+      "id": 74,
+      "x": 769,
+      "y": 926
+    },
+    {
+      "id": 75,
+      "x": 183,
+      "y": 431
+    },
+    {
+      "id": 76,
+      "x": 243,
+      "y": 396
+    },
+    {
+      "id": 77,
+      "x": 249,
+      "y": 463
+    },
+    {
+      "id": 78,
+      "x": 291,
+      "y": 462
+    },
+    {
+      "id": 79,
+      "x": 249,
+      "y": 544
+    },
+    {
+      "id": 80,
+      "x": 317,
+      "y": 391
+    },
+    {
+      "id": 81,
+      "x": 508,
+      "y": 381
+    },
+    {
+      "id": 82,
+      "x": 510,
+      "y": 452
+    },
+    {
+      "id": 83,
+      "x": 513,
+      "y": 521
+    },
+    {
+      "id": 84,
+      "x": 519,
+      "y": 563
+    },
+    {
+      "id": 85,
+      "x": 518,
+      "y": 600
+    },
+    {
+      "id": 86,
+      "x": 532,
+      "y": 631
+    },
+    {
+      "id": 87,
+      "x": 612,
+      "y": 630
+    },
+    {
+      "id": 88,
+      "x": 619,
+      "y": 596
+    },
+    {
+      "id": 89,
+      "x": 614,
+      "y": 521
+    },
+    {
+      "id": 90,
+      "x": 617,
+      "y": 446
+    },
+    {
+      "id": 91,
+      "x": 572,
+      "y": 441
+    },
+    {
+      "id": 92,
+      "x": 546,
+      "y": 417
+    },
+    {
+      "id": 93,
+      "x": 583,
+      "y": 415
+    },
+    {
+      "id": 94,
+      "x": 620,
+      "y": 392
+    },
+    {
+      "id": 95,
+      "x": 679,
+      "y": 382
+    },
+    {
+      "id": 96,
+      "x": 677,
+      "y": 417
+    },
+    {
+      "id": 97,
+      "x": 741,
+      "y": 417
+    },
+    {
+      "id": 98,
+      "x": 810,
+      "y": 412
+    },
+    {
+      "id": 99,
+      "x": 879,
+      "y": 415
+    },
+    {
+      "id": 100,
+      "x": 960,
+      "y": 414
+    },
+    {
+      "id": 101,
+      "x": 1026,
+      "y": 417
+    },
+    {
+      "id": 102,
+      "x": 714,
+      "y": 634
+    },
+    {
+      "id": 103,
+      "x": 782,
+      "y": 629
+    },
+    {
+      "id": 104,
+      "x": 857,
+      "y": 631
+    },
+    {
+      "id": 105,
+      "x": 923,
+      "y": 631
+    },
+    {
+      "id": 106,
+      "x": 988,
+      "y": 633
+    },
+    {
+      "id": 107,
+      "x": 1060,
+      "y": 631
+    },
+    {
+      "id": 108,
+      "x": 740,
+      "y": 391
+    },
+    {
+      "id": 109,
+      "x": 724,
+      "y": 354
+    },
+    {
+      "id": 110,
+      "x": 792,
+      "y": 354
+    },
+    {
+      "id": 111,
+      "x": 780,
+      "y": 384
+    },
+    {
+      "id": 112,
+      "x": 821,
+      "y": 384
+    },
+    {
+      "id": 113,
+      "x": 891,
+      "y": 385
+    },
+    {
+      "id": 114,
+      "x": 951,
+      "y": 385
+    },
+    {
+      "id": 115,
+      "x": 1012,
+      "y": 388
+    },
+    {
+      "id": 116,
+      "x": 1108,
+      "y": 628
+    },
+    {
+      "id": 117,
+      "x": 1112,
+      "y": 563
+    },
+    {
+      "id": 118,
+      "x": 1111,
+      "y": 513
+    },
+    {
+      "id": 119,
+      "x": 1112,
+      "y": 457
+    },
+    {
+      "id": 120,
+      "x": 1110,
+      "y": 390
+    },
+    {
+      "id": 121,
+      "x": 1112,
+      "y": 354
+    },
+    {
+      "id": 122,
+      "x": 1167,
+      "y": 351
+    },
+    {
+      "id": 123,
+      "x": 1160,
+      "y": 406
+    },
+    {
+      "id": 124,
+      "x": 1159,
+      "y": 458
+    },
+    {
+      "id": 125,
+      "x": 1161,
+      "y": 520
+    },
+    {
+      "id": 126,
+      "x": 1157,
+      "y": 567
+    },
+    {
+      "id": 127,
+      "x": 1156,
+      "y": 622
+    },
+    {
+      "id": 128,
+      "x": 717,
+      "y": 608
+    },
+    {
+      "id": 129,
+      "x": 785,
+      "y": 600
+    },
+    {
+      "id": 130,
+      "x": 855,
+      "y": 604
+    },
+    {
+      "id": 131,
+      "x": 930,
+      "y": 604
+    },
+    {
+      "id": 132,
+      "x": 987,
+      "y": 602
+    },
+    {
+      "id": 133,
+      "x": 1056,
+      "y": 604
+    },
+    {
+      "id": 134,
+      "x": 976,
+      "y": 571
+    },
+    {
+      "id": 135,
+      "x": 764,
+      "y": 578
+    },
+    {
+      "id": 136,
+      "x": 508,
+      "y": 75
+    },
+    {
+      "id": 137,
+      "x": 616,
+      "y": 75
+    },
+    {
+      "id": 138,
+      "x": 510,
+      "y": 134
+    },
+    {
+      "id": 139,
+      "x": 545,
+      "y": 136
+    },
+    {
+      "id": 140,
+      "x": 584,
+      "y": 129
+    },
+    {
+      "id": 141,
+      "x": 615,
+      "y": 127
+    },
+    {
+      "id": 142,
+      "x": 612,
+      "y": 186
+    },
+    {
+      "id": 143,
+      "x": 513,
+      "y": 180
+    },
+    {
+      "id": 144,
+      "x": 514,
+      "y": 230
+    },
+    {
+      "id": 145,
+      "x": 562,
+      "y": 228
+    },
+    {
+      "id": 146,
+      "x": 517,
+      "y": 263
+    },
+    {
+      "id": 147,
+      "x": 602,
+      "y": 258
+    },
+    {
+      "id": 148,
+      "x": 697,
+      "y": 261
+    },
+    {
+      "id": 149,
+      "x": 713,
+      "y": 290
+    },
+    {
+      "id": 150,
+      "x": 779,
+      "y": 289
+    },
+    {
+      "id": 151,
+      "x": 853,
+      "y": 293
+    },
+    {
+      "id": 152,
+      "x": 925,
+      "y": 295
+    },
+    {
+      "id": 153,
+      "x": 994,
+      "y": 292
+    },
+    {
+      "id": 154,
+      "x": 1062,
+      "y": 294
+    },
+    {
+      "id": 155,
+      "x": 775,
+      "y": 261
+    },
+    {
+      "id": 156,
+      "x": 757,
+      "y": 238
+    },
+    {
+      "id": 157,
+      "x": 848,
+      "y": 261
+    },
+    {
+      "id": 158,
+      "x": 923,
+      "y": 260
+    },
+    {
+      "id": 159,
+      "x": 991,
+      "y": 263
+    },
+    {
+      "id": 160,
+      "x": 1078,
+      "y": 262
+    },
+    {
+      "id": 161,
+      "x": 985,
+      "y": 235
+    },
+    {
+      "id": 162,
+      "x": 676,
+      "y": 73
+    },
+    {
+      "id": 163,
+      "x": 551,
+      "y": 1226
+    },
+    {
+      "id": 164,
+      "x": 732,
+      "y": 72
+    },
+    {
+      "id": 165,
+      "x": 772,
+      "y": 72
+    },
+    {
+      "id": 166,
+      "x": 820,
+      "y": 70
+    },
+    {
+      "id": 167,
+      "x": 880,
+      "y": 70
+    },
+    {
+      "id": 168,
+      "x": 956,
+      "y": 71
+    },
+    {
+      "id": 169,
+      "x": 1015,
+      "y": 70
+    },
+    {
+      "id": 170,
+      "x": 1029,
+      "y": 101
+    },
+    {
+      "id": 171,
+      "x": 958,
+      "y": 103
+    },
+    {
+      "id": 172,
+      "x": 882,
+      "y": 102
+    },
+    {
+      "id": 173,
+      "x": 816,
+      "y": 103
+    },
+    {
+      "id": 174,
+      "x": 749,
+      "y": 102
+    },
+    {
+      "id": 175,
+      "x": 670,
+      "y": 101
+    },
+    {
+      "id": 176,
+      "x": 727,
+      "y": 43
+    },
+    {
+      "id": 177,
+      "x": 763,
+      "y": 39
+    },
+    {
+      "id": 178,
+      "x": 817,
+      "y": 42
+    },
+    {
+      "id": 179,
+      "x": 881,
+      "y": 42
+    },
+    {
+      "id": 180,
+      "x": 957,
+      "y": 40
+    },
+    {
+      "id": 181,
+      "x": 1112,
+      "y": 74
+    },
+    {
+      "id": 182,
+      "x": 1108,
+      "y": 41
+    },
+    {
+      "id": 183,
+      "x": 1159,
+      "y": 37
+    },
+    {
+      "id": 184,
+      "x": 1109,
+      "y": 135
+    },
+    {
+      "id": 185,
+      "x": 1110,
+      "y": 213
+    },
+    {
+      "id": 186,
+      "x": 1108,
+      "y": 262
+    },
+    {
+      "id": 187,
+      "x": 1141,
+      "y": 262
+    },
+    {
+      "id": 188,
+      "x": 1145,
+      "y": 221
+    },
+    {
+      "id": 189,
+      "x": 1144,
+      "y": 130
+    },
+    {
+      "id": 190,
+      "x": 536,
+      "y": 289
+    },
+    {
+      "id": 191,
+      "x": 606,
+      "y": 292
+    },
+    {
+      "id": 192,
+      "x": 1110,
+      "y": 282
+    },
+    {
+      "id": 193,
+      "x": 566,
+      "y": 1131
+    },
+    {
+      "id": 194,
+      "x": 826,
+      "y": 1357
+    },
+    {
+      "id": 195,
+      "x": 919,
+      "y": 1358
+    },
+    {
+      "id": 196,
+      "x": 986,
+      "y": 1356
+    },
+    {
+      "id": 197,
+      "x": 458,
+      "y": 942
+    }
+  ],
+  "edges": [
+    {
+      "source": 30,
+      "target": 3,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 3,
+      "target": 10,
+      "type": "edge1",
+      "distance": "10"
+    },
+    {
+      "source": 3,
+      "target": 4,
+      "type": "edge1",
+      "distance": "10"
+    },
+    {
+      "source": 4,
+      "target": 9,
+      "type": "edge1",
+      "distance": "11"
+    },
+    {
+      "source": 9,
+      "target": 10,
+      "type": "edge1",
+      "distance": "12"
+    },
+    {
+      "source": 9,
+      "target": 8,
+      "type": "edge1",
+      "distance": "21"
+    },
+    {
+      "source": 5,
+      "target": 4,
+      "type": "edge1",
+      "distance": "20"
+    },
+    {
+      "source": 6,
+      "target": 5,
+      "type": "edge1",
+      "distance": "2"
+    },
+    {
+      "source": 6,
+      "target": 7,
+      "type": "edge1",
+      "distance": "3"
+    },
+    {
+      "source": 29,
+      "target": 7,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 7,
+      "target": 8,
+      "type": "edge1",
+      "distance": "7"
+    },
+    {
+      "source": 8,
+      "target": 26,
+      "type": "edge1",
+      "distance": "10"
+    },
+    {
+      "source": 193,
+      "target": 26,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 26,
+      "target": 25,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 27,
+      "target": 163,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 28,
+      "target": 5,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 9,
+      "target": 27,
+      "type": "edge1",
+      "distance": "10"
+    },
+    {
+      "source": 10,
+      "target": 11,
+      "type": "edge1",
+      "distance": "6"
+    },
+    {
+      "source": 11,
+      "target": 32,
+      "type": "edge1",
+      "distance": "3"
+    },
+    {
+      "source": 11,
+      "target": 31,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 11,
+      "target": 12,
+      "type": "edge1",
+      "distance": "14"
+    },
+    {
+      "source": 12,
+      "target": 24,
+      "type": "edge1",
+      "distance": "21"
+    },
+    {
+      "source": 35,
+      "target": 24,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 26,
+      "target": 35,
+      "type": "edge1",
+      "distance": "15"
+    },
+    {
+      "source": 20,
+      "target": 33,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 35,
+      "target": 33,
+      "type": "edge1",
+      "distance": "7"
+    },
+    {
+      "source": 33,
+      "target": 34,
+      "type": "edge1",
+      "distance": "15"
+    },
+    {
+      "source": 34,
+      "target": 22,
+      "type": "edge1",
+      "distance": "15"
+    },
+    {
+      "source": 34,
+      "target": 21,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 23,
+      "target": 13,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 12,
+      "target": 23,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 23,
+      "target": 194,
+      "type": "edge1",
+      "distance": "6"
+    },
+    {
+      "source": 194,
+      "target": 19,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 194,
+      "target": 195,
+      "type": "edge1",
+      "distance": "9"
+    },
+    {
+      "source": 195,
+      "target": 15,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 195,
+      "target": 14,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 195,
+      "target": 196,
+      "type": "edge1",
+      "distance": "10"
+    },
+    {
+      "source": 16,
+      "target": 196,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 196,
+      "target": 17,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 196,
+      "target": 18,
+      "type": "edge1",
+      "distance": "7"
+    },
+    {
+      "source": 1,
+      "target": 2,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 36,
+      "target": 37,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 37,
+      "target": 39,
+      "type": "edge1",
+      "distance": "7"
+    },
+    {
+      "source": 38,
+      "target": 39,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 39,
+      "target": 40,
+      "type": "edge1",
+      "distance": "10"
+    },
+    {
+      "source": 40,
+      "target": 49,
+      "type": "edge1",
+      "distance": "10"
+    },
+    {
+      "source": 40,
+      "target": 41,
+      "type": "edge1",
+      "distance": "6"
+    },
+    {
+      "source": 41,
+      "target": 42,
+      "type": "edge1",
+      "distance": "13"
+    },
+    {
+      "source": 42,
+      "target": 197,
+      "type": "edge1",
+      "distance": "7"
+    },
+    {
+      "source": 197,
+      "target": 44,
+      "type": "edge1",
+      "distance": "3"
+    },
+    {
+      "source": 43,
+      "target": 44,
+      "type": "edge1",
+      "distance": "7"
+    },
+    {
+      "source": 43,
+      "target": 50,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 2,
+      "target": 44,
+      "type": "edge1",
+      "distance": "19"
+    },
+    {
+      "source": 44,
+      "target": 45,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 44,
+      "target": 46,
+      "type": "edge1",
+      "distance": "6"
+    },
+    {
+      "source": 46,
+      "target": 47,
+      "type": "edge1",
+      "distance": "12"
+    },
+    {
+      "source": 48,
+      "target": 47,
+      "type": "edge1",
+      "distance": "12"
+    },
+    {
+      "source": 49,
+      "target": 48,
+      "type": "edge1",
+      "distance": "7"
+    },
+    {
+      "source": 51,
+      "target": 52,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 41,
+      "target": 52,
+      "type": "edge1",
+      "distance": "4"
+    },
+    {
+      "source": 52,
+      "target": 48,
+      "type": "edge1",
+      "distance": "6"
+    },
+    {
+      "source": 42,
+      "target": 47,
+      "type": "edge1",
+      "distance": "7"
+    },
+    {
+      "source": 46,
+      "target": 61,
+      "type": "edge1",
+      "distance": "7"
+    },
+    {
+      "source": 61,
+      "target": 62,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 73,
+      "target": 63,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 74,
+      "target": 73,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 72,
+      "target": 64,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 70,
+      "target": 65,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 70,
+      "target": 71,
+      "type": "edge1",
+      "distance": "2"
+    },
+    {
+      "source": 69,
+      "target": 66,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 68,
+      "target": 67,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 61,
+      "target": 73,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 73,
+      "target": 72,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 70,
+      "target": 72,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 70,
+      "target": 69,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 69,
+      "target": 68,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 49,
+      "target": 53,
+      "type": "edge1",
+      "distance": "4"
+    },
+    {
+      "source": 53,
+      "target": 54,
+      "type": "edge1",
+      "distance": "17"
+    },
+    {
+      "source": 54,
+      "target": 55,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 54,
+      "target": 57,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 57,
+      "target": 56,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 57,
+      "target": 58,
+      "type": "edge1",
+      "distance": "6"
+    },
+    {
+      "source": 59,
+      "target": 58,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 58,
+      "target": 60,
+      "type": "edge1",
+      "distance": "7"
+    },
+    {
+      "source": 75,
+      "target": 76,
+      "type": "edge1",
+      "distance": "3"
+    },
+    {
+      "source": 76,
+      "target": 77,
+      "type": "edge1",
+      "distance": "7"
+    },
+    {
+      "source": 77,
+      "target": 79,
+      "type": "edge1",
+      "distance": "16"
+    },
+    {
+      "source": 77,
+      "target": 78,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 76,
+      "target": 80,
+      "type": "edge1",
+      "distance": "7"
+    },
+    {
+      "source": 80,
+      "target": 81,
+      "type": "edge1",
+      "distance": "12"
+    },
+    {
+      "source": 81,
+      "target": 82,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 82,
+      "target": 83,
+      "type": "edge1",
+      "distance": "10"
+    },
+    {
+      "source": 83,
+      "target": 84,
+      "type": "edge1",
+      "distance": "10"
+    },
+    {
+      "source": 84,
+      "target": 85,
+      "type": "edge1",
+      "distance": "5"
+    },
+    {
+      "source": 86,
+      "target": 85,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 85,
+      "target": 88,
+      "type": "edge1",
+      "distance": "7"
+    },
+    {
+      "source": 88,
+      "target": 87,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 88,
+      "target": 89,
+      "type": "edge1",
+      "distance": "14"
+    },
+    {
+      "source": 90,
+      "target": 89,
+      "type": "edge1",
+      "distance": "12"
+    },
+    {
+      "source": 94,
+      "target": 90,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 81,
+      "target": 94,
+      "type": "edge1",
+      "distance": "11"
+    },
+    {
+      "source": 83,
+      "target": 89,
+      "type": "edge1",
+      "distance": "7"
+    },
+    {
+      "source": 92,
+      "target": 91,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 93,
+      "target": 91,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 82,
+      "target": 91,
+      "type": "edge1",
+      "distance": "4"
+    },
+    {
+      "source": 91,
+      "target": 90,
+      "type": "edge1",
+      "distance": "4"
+    },
+    {
+      "source": 94,
+      "target": 95,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 95,
+      "target": 96,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 108,
+      "target": 95,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 108,
+      "target": 111,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 111,
+      "target": 112,
+      "type": "edge1",
+      "distance": "7"
+    },
+    {
+      "source": 111,
+      "target": 98,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 109,
+      "target": 108,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 108,
+      "target": 97,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 111,
+      "target": 110,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 112,
+      "target": 113,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 113,
+      "target": 114,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 114,
+      "target": 115,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 114,
+      "target": 100,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 113,
+      "target": 99,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 115,
+      "target": 101,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 88,
+      "target": 128,
+      "type": "edge1",
+      "distance": "7"
+    },
+    {
+      "source": 128,
+      "target": 102,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 129,
+      "target": 103,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 135,
+      "target": 129,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 130,
+      "target": 104,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 131,
+      "target": 105,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 132,
+      "target": 106,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 134,
+      "target": 132,
+      "type": "edge1",
+      "distance": "2"
+    },
+    {
+      "source": 133,
+      "target": 107,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 128,
+      "target": 129,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 129,
+      "target": 130,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 130,
+      "target": 131,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 131,
+      "target": 132,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 132,
+      "target": 133,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 133,
+      "target": 116,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 116,
+      "target": 127,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 117,
+      "target": 126,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 118,
+      "target": 125,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 119,
+      "target": 124,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 120,
+      "target": 123,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 121,
+      "target": 122,
+      "type": "edge1",
+      "distance": "6"
+    },
+    {
+      "source": 116,
+      "target": 117,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 118,
+      "target": 117,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 119,
+      "target": 118,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 119,
+      "target": 120,
+      "type": "edge1",
+      "distance": "9"
+    },
+    {
+      "source": 121,
+      "target": 120,
+      "type": "edge1",
+      "distance": "6"
+    },
+    {
+      "source": 115,
+      "target": 120,
+      "type": "edge1",
+      "distance": "12"
+    },
+    {
+      "source": 136,
+      "target": 138,
+      "type": "edge1",
+      "distance": "5"
+    },
+    {
+      "source": 138,
+      "target": 143,
+      "type": "edge1",
+      "distance": "12"
+    },
+    {
+      "source": 143,
+      "target": 144,
+      "type": "edge1",
+      "distance": "10"
+    },
+    {
+      "source": 144,
+      "target": 146,
+      "type": "edge1",
+      "distance": "5"
+    },
+    {
+      "source": 146,
+      "target": 190,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 144,
+      "target": 145,
+      "type": "edge1",
+      "distance": "5"
+    },
+    {
+      "source": 146,
+      "target": 147,
+      "type": "edge1",
+      "distance": "7"
+    },
+    {
+      "source": 147,
+      "target": 191,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 143,
+      "target": 142,
+      "type": "edge1",
+      "distance": "9"
+    },
+    {
+      "source": 141,
+      "target": 142,
+      "type": "edge1",
+      "distance": "12"
+    },
+    {
+      "source": 140,
+      "target": 141,
+      "type": "edge1",
+      "distance": "3"
+    },
+    {
+      "source": 139,
+      "target": 140,
+      "type": "edge1",
+      "distance": "3"
+    },
+    {
+      "source": 138,
+      "target": 139,
+      "type": "edge1",
+      "distance": "3"
+    },
+    {
+      "source": 136,
+      "target": 137,
+      "type": "edge1",
+      "distance": "9"
+    },
+    {
+      "source": 137,
+      "target": 162,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 162,
+      "target": 175,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 137,
+      "target": 141,
+      "type": "edge1",
+      "distance": "5"
+    },
+    {
+      "source": 142,
+      "target": 147,
+      "type": "edge1",
+      "distance": "15"
+    },
+    {
+      "source": 162,
+      "target": 164,
+      "type": "edge1",
+      "distance": "5"
+    },
+    {
+      "source": 164,
+      "target": 174,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 176,
+      "target": 164,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 164,
+      "target": 165,
+      "type": "edge1",
+      "distance": "7"
+    },
+    {
+      "source": 177,
+      "target": 165,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 165,
+      "target": 166,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 178,
+      "target": 166,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 166,
+      "target": 173,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 166,
+      "target": 167,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 167,
+      "target": 168,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 168,
+      "target": 169,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 180,
+      "target": 168,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 179,
+      "target": 167,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 167,
+      "target": 172,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 168,
+      "target": 171,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 169,
+      "target": 170,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 169,
+      "target": 181,
+      "type": "edge1",
+      "distance": "12"
+    },
+    {
+      "source": 182,
+      "target": 181,
+      "type": "edge1",
+      "distance": "7"
+    },
+    {
+      "source": 182,
+      "target": 183,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 181,
+      "target": 184,
+      "type": "edge1",
+      "distance": "14"
+    },
+    {
+      "source": 184,
+      "target": 185,
+      "type": "edge1",
+      "distance": "11"
+    },
+    {
+      "source": 185,
+      "target": 186,
+      "type": "edge1",
+      "distance": "9"
+    },
+    {
+      "source": 186,
+      "target": 192,
+      "type": "edge1",
+      "distance": "2"
+    },
+    {
+      "source": 186,
+      "target": 187,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 185,
+      "target": 188,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 184,
+      "target": 189,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 147,
+      "target": 148,
+      "type": "edge1",
+      "distance": "7"
+    },
+    {
+      "source": 148,
+      "target": 149,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 155,
+      "target": 150,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 157,
+      "target": 151,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 158,
+      "target": 152,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 159,
+      "target": 153,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 161,
+      "target": 159,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 160,
+      "target": 154,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 160,
+      "target": 192,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 159,
+      "target": 160,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 158,
+      "target": 159,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 157,
+      "target": 158,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 148,
+      "target": 155,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 155,
+      "target": 157,
+      "type": "edge1",
+      "distance": "8"
+    },
+    {
+      "source": 156,
+      "target": 155,
+      "type": "edge1",
+      "distance": "1"
+    },
+    {
+      "source": 12,
+      "target": 61,
+      "type": "edge2",
+      "distance": "21"
+    },
+    {
+      "source": 18,
+      "target": 68,
+      "type": "edge2",
+      "distance": "19"
+    },
+    {
+      "source": 2,
+      "target": 79,
+      "type": "edge2",
+      "distance": "27"
+    },
+    {
+      "source": 68,
+      "target": 133,
+      "type": "edge2",
+      "distance": "19"
+    },
+    {
+      "source": 60,
+      "target": 115,
+      "type": "edge2",
+      "distance": "24"
+    },
+    {
+      "source": 60,
+      "target": 22,
+      "type": "edge2",
+      "distance": "19"
+    },
+    {
+      "source": 169,
+      "target": 115,
+      "type": "edge2",
+      "distance": "19"
+    },
+    {
+      "source": 192,
+      "target": 116,
+      "type": "edge2",
+      "distance": "22"
+    },
+    {
+      "source": 160,
+      "target": 133,
+      "type": "edge2",
+      "distance": "19"
+    },
+    {
+      "source": 53,
+      "target": 35,
+      "type": "edge2",
+      "distance": "23"
+    },
+    {
+      "source": 128,
+      "target": 61,
+      "type": "edge2",
+      "distance": "21"
+    },
+    {
+      "source": 95,
+      "target": 53,
+      "type": "edge2",
+      "distance": "23"
+    },
+    {
+      "source": 128,
+      "target": 148,
+      "type": "edge2",
+      "distance": "21"
+    },
+    {
+      "source": 162,
+      "target": 95,
+      "type": "edge2",
+      "distance": "23"
+    },
+    {
+      "source": 2,
+      "target": 4,
+      "type": "edge2",
+      "distance": "27"
+    }
+  ]
+};
+            // =====================================================================
+
+            nodes = myGraphData.nodes || [];
+            edges = myGraphData.edges || [];
+            initCanvas();
+        });
+
+        imgElement.onload = initCanvas;
+        
+        function initCanvas() {
+            if (imgElement.complete && nodes.length > 0) {
+                canvas.width = imgElement.width;
+                canvas.height = imgElement.height;
+                draw();
+            }
+        }
+
+        // 최단 경로 알고리즘
+        function calculateShortestPath(startId, endId) {
+            const graph = {};
+            nodes.forEach(n => graph[n.id] = []);
+            
+            // 모든 엣지(빨강, 파랑)를 연결 그래프로 구성
+            edges.forEach(e => {
+                const dist = parseFloat(e.distance);
+                graph[e.source].push({ node: e.target, weight: dist });
+                graph[e.target].push({ node: e.source, weight: dist });
+            });
+
+            const distances = {};
+            const previous = {};
+            const queue = new Set();
+
+            nodes.forEach(n => {
+                distances[n.id] = Infinity;
+                previous[n.id] = null;
+                queue.add(n.id);
+            });
+            distances[startId] = 0;
+
+            while (queue.size > 0) {
+                let minNodeId = null;
+                queue.forEach(id => {
+                    if (minNodeId === null || distances[id] < distances[minNodeId]) {
+                        minNodeId = id;
+                    }
+                });
+
+                if (distances[minNodeId] === Infinity || minNodeId === endId) {
+                    break;
+                }
+
+                queue.delete(minNodeId);
+
+                const neighbors = graph[minNodeId] || [];
+                neighbors.forEach(neighbor => {
+                    if (!queue.has(neighbor.node)) return;
+                    const alt = distances[minNodeId] + neighbor.weight;
+                    if (alt < distances[neighbor.node]) {
+                        distances[neighbor.node] = alt;
+                        previous[neighbor.node] = minNodeId;
+                    }
+                });
+            }
+
+            const path = [];
+            let curr = endId;
+            if (previous[curr] !== null || curr === startId) {
+                while (curr !== null) {
+                    path.unshift(curr);
+                    curr = previous[curr];
+                }
+            }
+
+            return path.length > 1 ? path : null;
+        }
+
+        function getNodeAt(x, y) {
+            return nodes.find(n => {
+                const dx = n.x - x;
+                const dy = n.y - y;
+                return Math.sqrt(dx*dx + dy*dy) <= 10; 
+            });
+        }
+
+        canvas.addEventListener('click', function(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            const clickedNode = getNodeAt(x, y);
+            if (!clickedNode) return;
+
+            if (!startNode) {
+                startNode = clickedNode;
+                statusMsg.innerText = `안내: 출발지가 선택되었습니다. ➔ 도착할 지점을 클릭하세요.`;
+            } else if (!endNode) {
+                if (clickedNode.id === startNode.id) return; 
+                endNode = clickedNode;
+                
+                shortestPath = calculateShortestPath(startNode.id, endNode.id);
+
+                if (shortestPath) {
+                    statusMsg.innerText = `안내: 경로 탐색이 완료되었습니다! (계단 구간은 파란색 노드('S' 표시)로 대체됩니다)`;
+                } else {
+                    statusMsg.innerText = `안내: 경로를 찾을 수 없습니다. (연결되지 않음)`;
+                }
+            } else {
+                startNode = clickedNode;
+                endNode = null;
+                shortestPath = null;
+                statusMsg.innerText = `안내: 출발지가 선택되었습니다. ➔ 도착할 지점을 클릭하세요.`;
+            }
+            draw();
+        });
+
+        function resetSelection() {
+            startNode = null;
+            endNode = null;
+            shortestPath = null;
+            statusMsg.innerText = "안내: 출발할 지점을 클릭하세요.";
+            draw();
+        }
+
+        // 화살표 그리는 함수
+        function drawArrowhead(x1, y1, x2, y2) {
+            const angle = Math.atan2(y2 - y1, x2 - x1);
+            const targetX = x2 - (NODE_RADIUS + 2) * Math.cos(angle);
+            const targetY = y2 - (NODE_RADIUS + 2) * Math.sin(angle);
+            const headlen = 12;
+
+            ctx.beginPath();
+            ctx.moveTo(targetX, targetY);
+            ctx.lineTo(targetX - headlen * Math.cos(angle - Math.PI / 6), targetY - headlen * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(targetX - headlen * Math.cos(angle + Math.PI / 6), targetY - headlen * Math.sin(angle + Math.PI / 6));
+            ctx.lineTo(targetX, targetY);
+            ctx.fillStyle = '#dc3545'; // 모든 화살표는 빨간색 (에지 그릴 때만 호출됨)
+            ctx.fill();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 최단 경로 데이터 중 '계단'으로 연결된 노드 ID들의 세트 (중복 제거)
+            let stairNodes = new Set();
+            if (shortestPath) {
+                for (let i = 0; i < shortestPath.length - 1; i++) {
+                    const sn_id = shortestPath[i];
+                    const tn_id = shortestPath[i+1];
+                    const connectingEdge = edges.find(e => 
+                        (e.source === sn_id && e.target === tn_id) || 
+                        (e.source === tn_id && e.target === sn_id)
+                    );
+                    if (connectingEdge && connectingEdge.type === 'edge2') {
+                        stairNodes.add(sn_id);
+                        stairNodes.add(tn_id);
+                    }
+                }
+            }
+
+            // 경로가 있을 때 일반(edge1) 엣지(선)만 그리기
+            if (shortestPath) {
+                for (let i = 0; i < shortestPath.length - 1; i++) {
+                    const sn = nodes.find(n => n.id === shortestPath[i]);
+                    const tn = nodes.find(n => n.id === shortestPath[i+1]);
+                    
+                    const connectingEdge = edges.find(e => 
+                        (e.source === sn.id && e.target === tn.id) || 
+                        (e.source === tn.id && e.target === sn.id)
+                    );
+
+                    // 엣지가 존재하고, '일반(edge1)'일 경우에만 화면에 표시
+                    if (sn && tn && connectingEdge && connectingEdge.type === 'edge1') {
+                        // 선 그리기
+                        ctx.beginPath();
+                        ctx.lineWidth = 4;
+                        ctx.strokeStyle = '#dc3545';
+                        ctx.setLineDash([]); 
+                        ctx.moveTo(sn.x, sn.y);
+                        ctx.lineTo(tn.x, tn.y);
+                        ctx.stroke();
+
+                        // 화살표 그리기
+                        drawArrowhead(sn.x, sn.y, tn.x, tn.y);
+                    }
+                }
+            }
+
+            // 노드 그리기
+            nodes.forEach(node => {
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, NODE_RADIUS, 0, 2 * Math.PI, false);
+                
+                let isStairNode = stairNodes.has(node.id); // 현재 노드가 최단 경로상의 계단 입/출구인지 확인
+
+                if (startNode && startNode.id === node.id) {
+                    ctx.fillStyle = '#28a745'; // 출발지 (녹색)
+                    ctx.arc(node.x, node.y, NODE_RADIUS + 2, 0, 2 * Math.PI, false); 
+                } else if (endNode && endNode.id === node.id) {
+                    ctx.fillStyle = '#fd7e14'; // 도착지 (주황색)
+                    ctx.arc(node.x, node.y, NODE_RADIUS + 2, 0, 2 * Math.PI, false); 
+                } else if (isStairNode) {
+                    ctx.fillStyle = '#007bff'; // 계단 입/출구 (파란색, sub-set of path nodes)
+                } else if (shortestPath && shortestPath.includes(node.id)) {
+                    ctx.fillStyle = '#dc3545'; // 일반 경로 (빨간색)
+                } else {
+                    ctx.fillStyle = '#17a2b8'; // 기본 노드 (청록색)
+                }
+                
+                ctx.fill();
+
+                // 계단 노드일 경우 'S' 글씨 그리기
+                if (isStairNode) {
+                    ctx.fillStyle = 'white'; // 흰색 글씨
+                    ctx.font = 'bold 10px Malgun Gothic'; // 폰트 설정
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('S', node.x, node.y);
+                }
+            });
+        }
+    </script>
+</body>
+</html>
