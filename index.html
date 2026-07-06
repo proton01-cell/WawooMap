@@ -2,16 +2,26 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>최단 경로 안내 시스템</title>
     <style>
-        body { font-family: 'Malgun Gothic', sans-serif; margin: 20px; background-color: #f8f9fa; }
-        #info-panel { margin-bottom: 15px; padding: 15px; background: #fff; border: 1px solid #dee2e6; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .status-text { font-weight: bold; color: #495057; }
-        #workspace { position: relative; display: inline-block; border: 2px solid #343a40; border-radius: 4px; overflow: hidden; background-color: #fff; }
-        #bg-image { display: block; max-width: 100%; pointer-events: none; }
-        #graph-canvas { position: absolute; top: 0; left: 0; cursor: pointer; }
-        button { padding: 6px 12px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 10px; }
+        body { font-family: 'Malgun Gothic', sans-serif; margin: 15px; background-color: #f8f9fa; }
+        h2 { font-size: 1.4rem; margin-top: 5px; }
+        #info-panel { margin-bottom: 15px; padding: 12px; background: #fff; border: 1px solid #dee2e6; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .status-text { font-weight: bold; color: #495057; display: block; margin-top: 10px; font-size: 0.95rem; }
+        
+        #search-container { position: relative; display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+        #search-box { flex: 1; padding: 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 16px; } 
+        #search-suggestions { position: absolute; top: 100%; left: 0; width: calc(100% - 95px); background: white; border: 1px solid #ced4da; border-top: none; max-height: 180px; overflow-y: auto; z-index: 10; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .suggestion-item { padding: 12px; cursor: pointer; border-bottom: 1px solid #f1f3f5; font-size: 0.95rem; }
+        .suggestion-item:hover { background-color: #e9ecef; }
+        
+        /* [수정됨] 좌표를 틀어지게 만들던 border를 제거하고 outline으로 대체 (레이아웃 간섭 없음) */
+        #workspace { position: relative; display: inline-block; width: 100%; max-width: 100%; overflow: hidden; background-color: #fff; outline: 2px solid #343a40; }
+        #bg-image { display: block; width: 100%; height: auto; pointer-events: none; }
+        #graph-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: pointer; }
+        
+        button { padding: 10px 14px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap; font-size: 0.9rem; }
         button:hover { background-color: #5a6268; }
     </style>
 </head>
@@ -20,8 +30,12 @@
     <h2>🗺️ 최단 경로 안내 시스템</h2>
     
     <div id="info-panel">
-        <span id="status-message" class="status-text">안내: 출발할 지점을 클릭하세요.</span>
-        <button onclick="resetSelection()">선택 초기화</button>
+        <div id="search-container">
+            <input type="text" id="search-box" placeholder="장소 검색 (예: 정문, 식당)" autocomplete="off">
+            <div id="search-suggestions"></div>
+            <button onclick="resetSelection()">초기화</button>
+        </div>
+        <span id="status-message" class="status-text">안내: 출발할 지점을 선택하거나 검색하세요.</span>
     </div>
 
     <div id="workspace">
@@ -34,6 +48,8 @@
         const ctx = canvas.getContext('2d');
         const imgElement = document.getElementById('bg-image');
         const statusMsg = document.getElementById('status-message');
+        const searchBox = document.getElementById('search-box');
+        const searchSuggestions = document.getElementById('search-suggestions');
 
         const NODE_RADIUS = 5;
 
@@ -44,11 +60,94 @@
         let endNode = null;
         let shortestPath = null; 
 
+        // 장소 이름: 노드 ID 매핑 데이터
+        const locationMap = {
+    '컴퓨터실': 75,
+    '정보융합실': 78,
+    '2-12': 86,
+    '2-11': 87,
+    '2-6': 102,
+    '2-5': 103,
+    '2-4': 104,
+    '2-3': 105,
+    '2-2': 106,
+    '2-1': 107,
+    '2학년 교무실': 134,
+    '교육정보부': 109,
+    '공용강의실2': 110,
+    '2-7': 96,
+    '2-8': 97,
+    '2-9': 98,
+    '2-10': 99,
+    '2-11': 100,
+    '2-12': 101,
+    '와우아트랩(미술실)': 122,
+    '제2교무실': 123,
+    '1-10': 124,
+    '1-9': 125,
+    '1-8': 126,
+    '1-7': 127,
+    '공용강의실3': 190,
+    '공용강의실4': 191,
+    '3-6': 149,
+    '3-5': 150,
+    '3-4': 151,
+    '3-3': 152,
+    '3-2': 153,
+    '3-1': 154,
+    '3-7': 175,
+    '3-8': 174,
+    '3-9': 173,
+    '3-10': 172,
+    '3-11': 171,
+    '3-12': 170,
+    '3학년교무실': 161,
+    '진로진학부': 176,
+    '진로상담실': 177,
+    '공용강의실': 178,
+    '학생나래부': 179,
+    '다온터(스터디카페)': 183,
+    '와우디지털랩(컴퓨터실)': 189,
+    '다목적실1': 188,
+    '다목적실2(모의면접실)': 197,
+    '식당': 30,
+    '교육행정실': 31,
+    '교장실': 13,
+    '방송실': 19,
+    '통합-Edu 1반': 14,
+    '통합-Edu 2반': 15,
+    '통합-Edu 3반': 16,
+    '보건실': 17,
+    '교구보관실': 32,
+    '미술실': 28,
+    '시청각실': 25,
+    '생명과학실': 20,
+    '화학실': 21,
+    'Wee 클래스': 24,
+    '음악실': 29,
+    '강당': 1,
+    '와우도서관': 36,
+    '창의융합실(고사본부)': 38,
+    '대회의실(운영위실)': 45,
+    '제1교무실(본교무실)': 55,
+    '액티브존': 54,
+    '물리지구과학실': 56,
+    '1학년 교무실': 71,
+    '1-6': 62,
+    '1-5': 63,
+    '1-4': 64,
+    '1-3': 65,
+    '1-2': 66,
+    '1-1': 67,
+};
+
+        // 데이터 원본 사이즈를 변수로 빼서 좌표 기준점으로 사용
+        let originalWidth = 800;
+        let originalHeight = 600;
+
         window.addEventListener('DOMContentLoaded', () => {
             
-            // =====================================================================
-            // ★ 가지고 계신 JSON 데이터를 아래에 복사해서 붙여넣으세요! ★
-            // =====================================================================
+            // 가지고 계신 JSON 데이터를 붙여넣으세요
             const myGraphData = {
   "imageOriginalSize": {
     "width": 1238,
@@ -1167,12 +1266,6 @@
       "target": 12,
       "type": "edge1",
       "distance": "14"
-    },
-    {
-      "source": 12,
-      "target": 24,
-      "type": "edge1",
-      "distance": "21"
     },
     {
       "source": 35,
@@ -2376,223 +2469,208 @@
     }
   ]
 };
-            // =====================================================================
+
+            // [수정됨] JSON 데이터의 원본 사이즈를 캔버스의 절대 기준으로 삼음
+            if (myGraphData.imageOriginalSize) {
+                originalWidth = myGraphData.imageOriginalSize.width;
+                originalHeight = myGraphData.imageOriginalSize.height;
+            }
 
             nodes = myGraphData.nodes || [];
             edges = myGraphData.edges || [];
+            
+            // 이미지가 다 로드되지 않아도 캔버스는 데이터 크기대로 미리 초기화
             initCanvas();
         });
 
-        imgElement.onload = initCanvas;
+        imgElement.onload = function() {
+            // 이미지 로드가 완료되면 다시 한 번 그려줌 (모바일 렌더링 꼬임 방지)
+            draw();
+        };
         
         function initCanvas() {
-            if (imgElement.complete && nodes.length > 0) {
-                canvas.width = imgElement.width;
-                canvas.height = imgElement.height;
-                draw();
-            }
+            // [수정됨] 브라우저 이미지 크기에 의존하지 않고 데이터 원본 크기로 캔버스 내부 해상도 강제 고정
+            canvas.width = originalWidth;
+            canvas.height = originalHeight;
+            draw();
         }
+
+        // 검색창 기능
+        searchBox.addEventListener('input', function() {
+            const query = this.value.trim().toLowerCase();
+            searchSuggestions.innerHTML = '';
+            if (query === '') { searchSuggestions.style.display = 'none'; return; }
+
+            const matches = Object.keys(locationMap).filter(name => name.toLowerCase().includes(query));
+            if (matches.length > 0) {
+                matches.forEach(name => {
+                    const div = document.createElement('div');
+                    div.className = 'suggestion-item';
+                    div.innerText = name;
+                    div.onclick = () => {
+                        const nodeId = locationMap[name];
+                        const targetNode = nodes.find(n => n.id === nodeId);
+                        if (targetNode) handleNodeSelection(targetNode);
+                        searchBox.value = '';
+                        searchSuggestions.style.display = 'none';
+                    };
+                    searchSuggestions.appendChild(div);
+                });
+                searchSuggestions.style.display = 'block';
+            } else {
+                searchSuggestions.style.display = 'none';
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (e.target !== searchBox && !searchSuggestions.contains(e.target)) {
+                searchSuggestions.style.display = 'none';
+            }
+        });
 
         // 최단 경로 알고리즘
         function calculateShortestPath(startId, endId) {
             const graph = {};
             nodes.forEach(n => graph[n.id] = []);
-            
-            // 모든 엣지(빨강, 파랑)를 연결 그래프로 구성
             edges.forEach(e => {
                 const dist = parseFloat(e.distance);
                 graph[e.source].push({ node: e.target, weight: dist });
                 graph[e.target].push({ node: e.source, weight: dist });
             });
 
-            const distances = {};
-            const previous = {};
-            const queue = new Set();
-
-            nodes.forEach(n => {
-                distances[n.id] = Infinity;
-                previous[n.id] = null;
-                queue.add(n.id);
-            });
+            const distances = {}; const previous = {}; const queue = new Set();
+            nodes.forEach(n => { distances[n.id] = Infinity; previous[n.id] = null; queue.add(n.id); });
             distances[startId] = 0;
 
             while (queue.size > 0) {
                 let minNodeId = null;
-                queue.forEach(id => {
-                    if (minNodeId === null || distances[id] < distances[minNodeId]) {
-                        minNodeId = id;
-                    }
-                });
-
-                if (distances[minNodeId] === Infinity || minNodeId === endId) {
-                    break;
-                }
-
+                queue.forEach(id => { if (minNodeId === null || distances[id] < distances[minNodeId]) minNodeId = id; });
+                if (distances[minNodeId] === Infinity || minNodeId === endId) break;
                 queue.delete(minNodeId);
 
                 const neighbors = graph[minNodeId] || [];
                 neighbors.forEach(neighbor => {
                     if (!queue.has(neighbor.node)) return;
                     const alt = distances[minNodeId] + neighbor.weight;
-                    if (alt < distances[neighbor.node]) {
-                        distances[neighbor.node] = alt;
-                        previous[neighbor.node] = minNodeId;
-                    }
+                    if (alt < distances[neighbor.node]) { distances[neighbor.node] = alt; previous[neighbor.node] = minNodeId; }
                 });
             }
-
-            const path = [];
-            let curr = endId;
-            if (previous[curr] !== null || curr === startId) {
-                while (curr !== null) {
-                    path.unshift(curr);
-                    curr = previous[curr];
-                }
-            }
-
+            const path = []; let curr = endId;
+            if (previous[curr] !== null || curr === startId) { while (curr !== null) { path.unshift(curr); curr = previous[curr]; } }
             return path.length > 1 ? path : null;
         }
 
-        function getNodeAt(x, y) {
-            return nodes.find(n => {
-                const dx = n.x - x;
-                const dy = n.y - y;
-                return Math.sqrt(dx*dx + dy*dy) <= 10; 
-            });
-        }
-
-        canvas.addEventListener('click', function(e) {
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-
-            const clickedNode = getNodeAt(x, y);
-            if (!clickedNode) return;
-
+        function handleNodeSelection(clickedNode) {
             if (!startNode) {
                 startNode = clickedNode;
-                statusMsg.innerText = `안내: 출발지가 선택되었습니다. ➔ 도착할 지점을 클릭하세요.`;
+                statusMsg.innerText = `안내: 출발지 선택 완료 ➔ 도착지를 클릭하거나 검색하세요.`;
             } else if (!endNode) {
                 if (clickedNode.id === startNode.id) return; 
                 endNode = clickedNode;
-                
                 shortestPath = calculateShortestPath(startNode.id, endNode.id);
-
                 if (shortestPath) {
-                    statusMsg.innerText = `안내: 경로 탐색이 완료되었습니다! (계단 구간은 파란색 노드('S' 표시)로 대체됩니다)`;
+                    statusMsg.innerText = `안내: 경로 탐색 완료! (계단 구간은 파란색 'S' 노드)`;
                 } else {
-                    statusMsg.innerText = `안내: 경로를 찾을 수 없습니다. (연결되지 않음)`;
+                    statusMsg.innerText = `안내: 경로를 찾을 수 없습니다.`;
                 }
             } else {
-                startNode = clickedNode;
-                endNode = null;
-                shortestPath = null;
-                statusMsg.innerText = `안내: 출발지가 선택되었습니다. ➔ 도착할 지점을 클릭하세요.`;
+                startNode = clickedNode; endNode = null; shortestPath = null;
+                statusMsg.innerText = `안내: 출발지 선택 완료 ➔ 도착지를 클릭하거나 검색하세요.`;
             }
-            draw();
-        });
-
-        function resetSelection() {
-            startNode = null;
-            endNode = null;
-            shortestPath = null;
-            statusMsg.innerText = "안내: 출발할 지점을 클릭하세요.";
             draw();
         }
 
-        // 화살표 그리는 함수
+        function getNodeAt(x, y) {
+            return nodes.find(n => Math.hypot(n.x - x, n.y - y) <= 15); // 모바일 터치를 위해 반경을 조금 더 넉넉하게 15로 수정
+        }
+
+        // [수정됨] 클릭 좌표 계산 보정
+        canvas.addEventListener('click', function(e) {
+            const rect = canvas.getBoundingClientRect();
+            
+            // 실제 CSS 화면에서 차지하는 크기 대비 캔버스 내부 데이터 크기의 비율을 구함
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+
+            // 터치한 위치를 원본 좌표계로 정확하게 변환
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
+
+            const clickedNode = getNodeAt(x, y);
+            if (!clickedNode) return;
+            
+            handleNodeSelection(clickedNode);
+        });
+
+        function resetSelection() {
+            startNode = null; endNode = null; shortestPath = null;
+            searchBox.value = ''; searchSuggestions.style.display = 'none';
+            statusMsg.innerText = "안내: 출발할 지점을 선택하거나 검색하세요.";
+            draw();
+        }
+
         function drawArrowhead(x1, y1, x2, y2) {
             const angle = Math.atan2(y2 - y1, x2 - x1);
             const targetX = x2 - (NODE_RADIUS + 2) * Math.cos(angle);
             const targetY = y2 - (NODE_RADIUS + 2) * Math.sin(angle);
             const headlen = 12;
-
             ctx.beginPath();
             ctx.moveTo(targetX, targetY);
             ctx.lineTo(targetX - headlen * Math.cos(angle - Math.PI / 6), targetY - headlen * Math.sin(angle - Math.PI / 6));
             ctx.lineTo(targetX - headlen * Math.cos(angle + Math.PI / 6), targetY - headlen * Math.sin(angle + Math.PI / 6));
-            ctx.lineTo(targetX, targetY);
-            ctx.fillStyle = '#dc3545'; // 모든 화살표는 빨간색 (에지 그릴 때만 호출됨)
-            ctx.fill();
+            ctx.fillStyle = '#dc3545'; ctx.fill();
         }
 
         function draw() {
+            // 노드가 아직 없으면 그리지 않음
+            if (nodes.length === 0) return;
+
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // 최단 경로 데이터 중 '계단'으로 연결된 노드 ID들의 세트 (중복 제거)
             let stairNodes = new Set();
             if (shortestPath) {
                 for (let i = 0; i < shortestPath.length - 1; i++) {
-                    const sn_id = shortestPath[i];
-                    const tn_id = shortestPath[i+1];
-                    const connectingEdge = edges.find(e => 
-                        (e.source === sn_id && e.target === tn_id) || 
-                        (e.source === tn_id && e.target === sn_id)
-                    );
-                    if (connectingEdge && connectingEdge.type === 'edge2') {
-                        stairNodes.add(sn_id);
-                        stairNodes.add(tn_id);
-                    }
+                    const sn_id = shortestPath[i]; const tn_id = shortestPath[i+1];
+                    const edge = edges.find(e => (e.source === sn_id && e.target === tn_id) || (e.source === tn_id && e.target === sn_id));
+                    if (edge && edge.type === 'edge2') { stairNodes.add(sn_id); stairNodes.add(tn_id); }
                 }
             }
 
-            // 경로가 있을 때 일반(edge1) 엣지(선)만 그리기
             if (shortestPath) {
                 for (let i = 0; i < shortestPath.length - 1; i++) {
                     const sn = nodes.find(n => n.id === shortestPath[i]);
                     const tn = nodes.find(n => n.id === shortestPath[i+1]);
-                    
-                    const connectingEdge = edges.find(e => 
-                        (e.source === sn.id && e.target === tn.id) || 
-                        (e.source === tn.id && e.target === sn.id)
-                    );
+                    const edge = edges.find(e => (e.source === sn.id && e.target === tn.id) || (e.source === tn.id && e.target === sn.id));
 
-                    // 엣지가 존재하고, '일반(edge1)'일 경우에만 화면에 표시
-                    if (sn && tn && connectingEdge && connectingEdge.type === 'edge1') {
-                        // 선 그리기
-                        ctx.beginPath();
-                        ctx.lineWidth = 4;
-                        ctx.strokeStyle = '#dc3545';
-                        ctx.setLineDash([]); 
-                        ctx.moveTo(sn.x, sn.y);
-                        ctx.lineTo(tn.x, tn.y);
-                        ctx.stroke();
-
-                        // 화살표 그리기
+                    if (sn && tn && edge && edge.type === 'edge1') {
+                        ctx.beginPath(); ctx.lineWidth = 4; ctx.strokeStyle = '#dc3545';
+                        ctx.moveTo(sn.x, sn.y); ctx.lineTo(tn.x, tn.y); ctx.stroke();
                         drawArrowhead(sn.x, sn.y, tn.x, tn.y);
                     }
                 }
             }
 
-            // 노드 그리기
             nodes.forEach(node => {
                 ctx.beginPath();
                 ctx.arc(node.x, node.y, NODE_RADIUS, 0, 2 * Math.PI, false);
-                
-                let isStairNode = stairNodes.has(node.id); // 현재 노드가 최단 경로상의 계단 입/출구인지 확인
+                let isStairNode = stairNodes.has(node.id); 
 
                 if (startNode && startNode.id === node.id) {
-                    ctx.fillStyle = '#28a745'; // 출발지 (녹색)
-                    ctx.arc(node.x, node.y, NODE_RADIUS + 2, 0, 2 * Math.PI, false); 
+                    ctx.fillStyle = '#28a745'; ctx.arc(node.x, node.y, NODE_RADIUS + 2, 0, 2 * Math.PI, false); 
                 } else if (endNode && endNode.id === node.id) {
-                    ctx.fillStyle = '#fd7e14'; // 도착지 (주황색)
-                    ctx.arc(node.x, node.y, NODE_RADIUS + 2, 0, 2 * Math.PI, false); 
+                    ctx.fillStyle = '#fd7e14'; ctx.arc(node.x, node.y, NODE_RADIUS + 2, 0, 2 * Math.PI, false); 
                 } else if (isStairNode) {
-                    ctx.fillStyle = '#007bff'; // 계단 입/출구 (파란색, sub-set of path nodes)
+                    ctx.fillStyle = '#007bff'; 
                 } else if (shortestPath && shortestPath.includes(node.id)) {
-                    ctx.fillStyle = '#dc3545'; // 일반 경로 (빨간색)
+                    ctx.fillStyle = '#dc3545'; 
                 } else {
-                    ctx.fillStyle = '#17a2b8'; // 기본 노드 (청록색)
+                    ctx.fillStyle = '#17a2b8'; 
                 }
-                
                 ctx.fill();
 
-                // 계단 노드일 경우 'S' 글씨 그리기
                 if (isStairNode) {
-                    ctx.fillStyle = 'white'; // 흰색 글씨
-                    ctx.font = 'bold 10px Malgun Gothic'; // 폰트 설정
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
+                    ctx.fillStyle = 'white'; ctx.font = 'bold 10px Malgun Gothic'; 
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                     ctx.fillText('S', node.x, node.y);
                 }
             });
